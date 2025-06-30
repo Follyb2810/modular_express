@@ -1,0 +1,161 @@
+To integrate **Keycloak** with your **Express** app using **MongoDB** and support for different **roles** (buyer, seller, admin, super admin), follow these main steps:
+
+---
+
+### ✅ 1. **Set Up Keycloak**
+
+Install and configure Keycloak (on-premise or hosted):
+
+* Create a realm (e.g., `my-app`).
+* Create a client (e.g., `express-app`):
+
+  * Set access type to `confidential`.
+  * Add valid redirect URIs (e.g., `http://localhost:3000/*`).
+* Create roles: `buyer`, `seller`, `admin`, `super_admin`.
+* Create users and assign roles.
+* Save your client credentials (client ID, secret).
+
+---
+
+### ✅ 2. **Install Required Packages in Express**
+
+```bash
+npm install keycloak-connect express-session
+```
+
+---
+
+### ✅ 3. **Set Up Keycloak Middleware in Express**
+
+```ts
+import express from 'express';
+import session from 'express-session';
+import Keycloak from 'keycloak-connect';
+
+const app = express();
+
+const memoryStore = new session.MemoryStore();
+
+app.use(session({
+  secret: 'some-secret',
+  resave: false,
+  saveUninitialized: true,
+  store: memoryStore
+}));
+
+const keycloak = new Keycloak({ store: memoryStore });
+
+app.use(keycloak.middleware());
+```
+
+---
+
+### ✅ 4. **Protect Routes with Role-Based Access**
+
+```ts
+// Public route
+app.get('/', (req, res) => res.send('Public route'));
+
+// Protected route (any authenticated user)
+app.get('/protected', keycloak.protect(), (req, res) => res.send('Protected route'));
+
+// Role-protected routes
+app.get('/admin', keycloak.protect('realm:admin'), (req, res) => res.send('Admin route'));
+app.get('/super', keycloak.protect('realm:super_admin'), (req, res) => res.send('Super Admin route'));
+```
+
+> 📝 `realm:` is used to refer to realm-level roles (vs client-specific roles like `express-app:admin`).
+
+---
+
+### ✅ 5. **Get User Info and Store in MongoDB**
+
+After login, you can get the user profile using the Keycloak access token and optionally store/retrieve additional metadata in MongoDB.
+
+```ts
+import mongoose from 'mongoose';
+
+const userSchema = new mongoose.Schema({
+  keycloakId: String,
+  email: String,
+  role: String,
+});
+
+const User = mongoose.model('User', userSchema);
+
+app.get('/sync-user', keycloak.protect(), async (req, res) => {
+  const tokenContent = req.kauth.grant.access_token.content;
+
+  const user = await User.findOneAndUpdate(
+    { keycloakId: tokenContent.sub },
+    {
+      keycloakId: tokenContent.sub,
+      email: tokenContent.email,
+      role: tokenContent.realm_access.roles[0], // Or iterate as needed
+    },
+    { upsert: true, new: true }
+  );
+
+  res.json(user);
+});
+```
+
+---
+
+### ✅ 6. **Connecting MongoDB**
+
+```ts
+import mongoose from 'mongoose';
+
+mongoose.connect('mongodb://localhost:27017/yourdb')
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error(err));
+```
+
+---
+
+### ✅ 7. **Example Role Middleware (Optional)**
+
+You can also make your own middleware:
+
+```ts
+function hasRole(role: string) {
+  return (req, res, next) => {
+    const roles = req.kauth?.grant?.access_token?.content?.realm_access?.roles || [];
+    if (roles.includes(role)) {
+      next();
+    } else {
+      res.status(403).json({ message: 'Forbidden' });
+    }
+  };
+}
+
+// Usage
+app.get('/seller-only', keycloak.protect(), hasRole('seller'), (req, res) => {
+  res.send('Only sellers can see this');
+});
+```
+
+---
+
+### ✅ 8. **Using Tokens in Frontend**
+
+* Use Keycloak JS adapter or direct OpenID Connect integration.
+* After login, pass the bearer token in headers:
+
+```http
+GET /protected
+Authorization: Bearer <access_token>
+```
+
+---
+
+### ✅ Final Notes
+
+* Keep roles consistent in Keycloak and in your app logic.
+* You can manage additional profile fields in MongoDB that aren’t part of Keycloak.
+* Prefer storing Keycloak’s `sub` as the unique identifier.
+
+---
+
+If you want, I can generate a boilerplate project with Express, Keycloak, and MongoDB pre-configured. Just let me know.

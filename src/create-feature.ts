@@ -12,7 +12,7 @@ if (!featureName) {
 
 const pascal = featureName.charAt(0).toUpperCase() + featureName.slice(1);
 const kebab = featureName.toLowerCase();
-console.log(__dirname);
+console.log(__dirname, "this in create");
 const baseDir = path.join(__dirname, "features", kebab);
 if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
 
@@ -22,7 +22,7 @@ import { Request, Response } from 'express';
 import * as ${kebab}Service from './${kebab}.service';
 
 export const first = async (req: Request, res: Response) => {
-  const result = await ${kebab}Service.exampleService();
+  const result = await ${kebab}Service.${kebab}Service();
   res.status(200).json(result);
 };
 `,
@@ -51,7 +51,7 @@ import * as controller from './${kebab}.controller';
 
 const router = Router();
 
-router.get('/', controller.example);
+router.get('/', controller.first);
 
 export default router;
 `,
@@ -62,7 +62,8 @@ export const ${kebab}toDto = (entity: any) => {
   };
 };
 `,
-[`${kebab}.repository.ts`]:``
+  [`${kebab}.repository.ts`]: ``,
+  [`${kebab}.type.ts`]: ``,
 };
 
 Object.entries(files).forEach(([fileName, content]) => {
