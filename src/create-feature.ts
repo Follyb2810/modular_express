@@ -64,6 +64,7 @@ export const ${kebab}toDto = (entity: any) => {
 `,
   [`${kebab}.repository.ts`]: ``,
   [`${kebab}.type.ts`]: ``,
+  [`${kebab}.middleware.ts`]: ``,
 };
 
 Object.entries(files).forEach(([fileName, content]) => {
